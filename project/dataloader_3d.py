@@ -20,7 +20,7 @@ def getBugData(dataset_path: Path, num_classes=12, low_percentile = 0.0, high_pe
     for idx, item in enumerate(path_list):
             one_hot_v = np.zeros(num_classes)
             one_hot_v[idx] = 1
-            
+
             folder = os.listdir(str(dataset_path) + "/"+ item)
             start = int(len(folder)*low_percentile)
             end = int(len(folder)*high_percentile)
@@ -34,9 +34,10 @@ def getBugData(dataset_path: Path, num_classes=12, low_percentile = 0.0, high_pe
 DATA_PATH = "/dtu/3d-imaging-center/courses/02510/data/Bugs/bugnist_128/"
 
 # 1. Data. Make a 70-10-20% train-validation-test split here
-trainFiles = getBugData(dataset_path=Path(DATA_PATH))
-valFiles = getBugData(dataset_path=Path(DATA_PATH))  
-testFiles = getBugData(dataset_path=Path(DATA_PATH))
+
+trainFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.0, high_percentile=0.7)
+valFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.7, high_percentile=0.8)  
+testFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.8, high_percentile=1.0)
 
 train_transforms = monai.transforms.Compose([
     monai.transforms.LoadImaged(keys='image'),
