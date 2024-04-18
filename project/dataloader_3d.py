@@ -51,8 +51,8 @@ BATCH_SIZE = 1
 
 train_dataset = Dataset(data=trainFiles, transform=train_transforms)
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_dataset = None
-val_loader = None
+val_dataset = Dataset(data=valFiles, transform=train_transforms)
+val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True)
 
 model = ResNet(block = 'basic',
                 layers = [3, 4, 6, 3],
