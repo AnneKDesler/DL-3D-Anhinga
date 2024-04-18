@@ -14,16 +14,21 @@ import os
 import dxchange
 from tqdm import tqdm
 
-def getBugData(dataset_path: Path, num_classes=12):
+def getBugData(dataset_path: Path, num_classes=12, low_percentile = 0.0, high_percentile = 1.0):
     dataset = []
     path_list = os.listdir(dataset_path)
     for idx, item in enumerate(path_list):
             one_hot_v = np.zeros(num_classes)
             one_hot_v[idx] = 1
-            for file in os.listdir(str(dataset_path) + "/"+ item):
-                dataset.append({'image':str(dataset_path) + "/"+ item + "/" + file,#[:-4] + ".nii.gz",
-                                "class": str(item),
-                                "label": one_hot_v})
+            
+            folder = os.listdir(str(dataset_path) + "/"+ item)
+            start = int(len(folder)*low_percentile)
+            end = int(len(folder)*high_percentile)
+            for i, file in enumerate(folder):
+                if i >= start and i < end:
+                    dataset.append({'image':str(dataset_path) + "/"+ item + "/" + file,#[:-4] + ".nii.gz",
+                                    "class": str(item),
+                                    "label": one_hot_v})
     return dataset
 
 DATA_PATH = "/dtu/3d-imaging-center/courses/02510/data/Bugs/bugnist_128/"
