@@ -45,9 +45,9 @@ train_transforms = monai.transforms.Compose([
 ])
 
 # Hyper-parameters (next three lines) #
-NUM_EPOCHS = 1
+NUM_EPOCHS = 2
 EVAL_EVERY = 1
-BATCH_SIZE = 1
+BATCH_SIZE = 32
 
 train_dataset = Dataset(data=trainFiles, transform=train_transforms)
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
@@ -113,11 +113,14 @@ for epoch in range(NUM_EPOCHS):
     if epoch % EVAL_EVERY == 0:
         model.eval()
         with torch.no_grad():  # Do not need gradients for this part
-            for val_data in val_loader:
+            for val_data in tqdm(val_loader):
                 inputs = val_data['image'].cuda()
                 targets = val_data['label'].cuda()
 
                 outputs = model(inputs)
+
+                # apply softmax to the output of the network
+                outputs = torch.nn.functional.softmax(outputs, dim=1)
 
                 loss = loss_fn(outputs, targets)
                 epoch_loss += loss.detach()
@@ -128,6 +131,8 @@ for epoch in range(NUM_EPOCHS):
         val_losses.append(epoch_loss)
         print(f'Mean validation loss: {epoch_loss}')
 
+# save the model
+torch.save(model.state_dict(), "/dtu/3d-imaging-center/courses/02510/groups/group_Anhinga/Linea/DL-3D-Anhinga/project/model.pth")
 
 # Code for the task here
 # Plot the training loss over time
@@ -136,12 +141,13 @@ plt.title('Training loss')
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.legend()
-plt.save("/dtu/3d-imaging-center/courses/02510/groups/group_Anhinga/Linea/DL-3D-Anhinga/project/train.png")
+plt.savefig("/dtu/3d-imaging-center/courses/02510/groups/group_Anhinga/Linea/DL-3D-Anhinga/project/train.png", bbox_inches='tight')
 
 # Plot validation dice coefficients over time
-plt.plot(val_losses, label=['Class 1', 'Class 2', 'Class 3'])
+plt.plot(val_losses)#s, label=['Class 1', 'Class 2', 'Class 3'])
 plt.title('Validation dice coefficients')
 plt.xlabel('Epoch')
-plt.ylabel('Dice Loss')
+plt.ylabel('Loss')
 plt.legend()
-plt.save("/dtu/3d-imaging-center/courses/02510/groups/group_Anhinga/Linea/DL-3D-Anhinga/project/val.png")
+plt.savefig("/dtu/3d-imaging-center/courses/02510/groups/group_Anhinga/Linea/DL-3D-Anhinga/project/val.png", bbox_inches='tight')
+
