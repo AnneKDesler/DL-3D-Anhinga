@@ -76,6 +76,7 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
     # More design decisions (model, loss, optimizer) #
     loss_fn = torch.nn.CrossEntropyLoss() # Apply "softmax" to the output of the network and don't convert to onehot because this is done already by the transforms.
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3) 
+    scaler = torch.cuda.amp.GradScaler()
 
     inferer = monai.inferers.SliceInferer(roi_size=[-1, -1], spatial_dim=2, sw_batch_size=1)
 
@@ -91,21 +92,23 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
         epoch_loss = 0
         step = 0
         for tr_data in tqdm(train_loader):
-            inputs = tr_data['image'].cuda(non_blocking=True)
-            targets = tr_data['label'].cuda(non_blocking=True)
+            with torch.cuda.amp.autocast():
+                inputs = tr_data['image'].cuda(non_blocking=True)
+                targets = tr_data['label'].cuda(non_blocking=True)
 
-            # Forward -> Backward -> Step
-            optimizer.zero_grad()
+                # Forward -> Backward -> Step
+                optimizer.zero_grad()
 
-            outputs = model(inputs)
+                outputs = model(inputs)
 
-            # apply softmax to the output of the network
-            outputs = torch.nn.functional.softmax(outputs, dim=1)
+                # apply softmax to the output of the network
+                outputs = torch.nn.functional.softmax(outputs, dim=1)
 
-            loss = loss_fn(outputs, targets)
+                loss = loss_fn(outputs, targets)
 
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             epoch_loss += loss.detach()
             step += 1
