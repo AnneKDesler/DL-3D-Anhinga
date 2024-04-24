@@ -22,6 +22,12 @@ os.chdir('/dtu/3d-imaging-center/courses/02510/groups/group_Anhinga/Anne/DL-3D-A
 from get_data import getBugData
 
 def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
+
+    time = datetime.datetime.now()
+    t = time.strftime('%Y_%m_%d__%H_%M_%S')
+    save_folder = os.path.join("2D_models", f'learning_rate_{LR}', t)
+    os.makedirs(save_folder)
+
     DATA_PATH = 'data'
     # Hyper-parameters (next three lines) #
     #NUM_EPOCHS = 2
@@ -81,6 +87,8 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
     val_precisions = []
     train_recalls = []
     val_recalls = []
+
+    best_val_accuracy = 0
 
     print("Starting training")
 
@@ -176,21 +184,24 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
             # Log and store average epoch loss
             epoch_loss = epoch_loss / steps
             val_losses.append(epoch_loss)
-            val_accuracies.append(100 * correct / total)
+            val_accuracy = 100 * correct / total
+            val_accuracies.append(val_accuracy)
             val_precisions.append(precision_score(val_targets_all, val_predictions_all, average='macro'))
             val_recalls.append(recall_score(val_targets_all, val_predictions_all, average='macro'))
+            
+            if val_accuracy > best_val_accuracy:
+                best_val_accuracy = val_accuracy
+                torch.save(model.state_dict(), os.path.join(save_folder, "best_model.pt"))
             
             print(f'Mean validation loss: {epoch_loss}')
             print(f'Validation accuracy: {val_accuracies[-1]}%')
 
-    time = datetime.datetime.now()
-    t = time.strftime('%Y_%m_%d__%H_%M_%S')
-    save_folder = "2D_models/" + t
-    os.makedirs(save_folder)
+    
     # save the model
     torch.save(model.state_dict(), os.path.join(save_folder, "model.pt"))
 
-    save_folder = "2D_results/" + t
+    save_folder = os.path.join("2D_results", f'learning_rate_{LR}', t)
+    os.makedirs(save_folder)
     # Code for the task here
     # Plot the training loss over time
     plt.figure()
@@ -237,7 +248,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--image_size', type=str, default=128,
                         help="Size of volumes in the dataset. Choose 064, 128 or 256")
-    parser.add_argument('--num_epochs', type=int, default=3)
+    parser.add_argument('--num_epochs', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--seed', type=int, default=42)
