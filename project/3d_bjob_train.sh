@@ -8,11 +8,12 @@
 #BSUB -n 8
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
+#BSUB -u s185231@dtu.dk
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
-#BSUB -W 00:4
+#BSUB -W 03:00
 # specify system resources
 #BSUB -R "span[hosts=1]"
-#BSUB -R "rusage[mem=1GB]"
+#BSUB -R "rusage[mem=16GB]"
 #BSUB -R "select[gpu32gb]"
 #BSUB -R "select[sxm2]"
 ### -- Specify the output and error file. %J is the job-id --
@@ -26,14 +27,14 @@ conda activate env-02510
 
 export CUDA_VISIBLE_DEVICES=0
 
-learning_rates=(1e-3 1e-4 1e-4)
+learning_rates=(1e-3 1e-4 1e-5)
 batch_sizes=(16)
 
 for n in "${learning_rates[@]}"
 do
     for m in "${batch_sizes[@]}"
     do
-        python -u 3d_train.py --lr $n --batch_size $m
+        python -u 3d_train.py --lr $n --batch_size $m --num_epochs 50
     done
 done
 

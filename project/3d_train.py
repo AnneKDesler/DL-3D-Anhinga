@@ -11,47 +11,24 @@ import nibabel as nib
 from tqdm import tqdm
 import medpy.metric as metric
 import os
+import seaborn as sns  
 import dxchange
 from tqdm import tqdm
 import argparse
 import datetime
 from get_data import getBugData
-
-""" 
-def getBugData(dataset_path: Path, num_classes=12, low_percentile = 0.0, high_percentile = 1.0):
-    dataset = []
-    path_list = os.listdir(dataset_path)
-    for idx, item in enumerate(path_list):
-        one_hot_v = np.zeros(num_classes)
-       one_hot_v[idx] = 1
-
-        folder = os.listdir(str(dataset_path) + "/"+ item)
-
-        start = int(len(folder)*low_percentile)
-        end = int(len(folder)*high_percentile)
-        for i, file in enumerate(folder):
-            if i >= start and i < end:
-                dataset.append({'image':str(dataset_path) + "/"+ item + "/" + file,
-                                "class": str(item),
-                                "label": one_hot_v})
-    return dataset
-"""
+from sklearn.metrics import confusion_matrix, precision_score, recall_score
 
 def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
     if image_size == 64:
         image_size = "064"
     DATA_PATH = "/dtu/3d-imaging-center/courses/02510/data/Bugs/bugnist_" + str(image_size) + "/"
     # Hyper-parameters (next three lines) #
-    #NUM_EPOCHS = 2
     EVAL_EVERY = 1
-    #BATCH_SIZE = 2
 
     # 1. Data. Make a 70-10-20% train-validation-test split here
-    #trainFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.0, high_percentile=0.7)
     trainFiles = getBugData(dataset_path=Path(DATA_PATH),low_percentile = 0.0, high_percentile = 0.7, dim = 3, seed = 42)
     valFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.7, high_percentile=0.8, dim = 3, seed = 42)
-    #valFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.7, high_percentile=0.8)  
-    #testFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.8, high_percentile=1.0)
 
     train_transforms = monai.transforms.Compose([
         monai.transforms.LoadImaged(keys='image'),
@@ -82,10 +59,18 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
     optimizer = torch.optim.Adam(model.parameters(), lr=LR) 
     scaler = torch.cuda.amp.GradScaler()
 
-    inferer = monai.inferers.SliceInferer(roi_size=[-1, -1], spatial_dim=2, sw_batch_size=1)
+    #inferer = monai.inferers.SliceInferer(roi_size=[-1, -1], spatial_dim=2, sw_batch_size=1)
 
     train_losses = []
     val_losses = []
+    train_accuracies = []
+    val_accuracies = []
+
+    train_precisions = []
+    val_precisions = []
+
+    train_recalls = [] 
+    val_recalls = []
 
     print("Starting training")
 
@@ -95,6 +80,11 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
         model.train()
         epoch_loss = 0
         step = 0
+        total = 0
+        correct = 0
+        train_targets_all = []
+        train_predictions_all = []
+
         for tr_data in tqdm(train_loader):
             with torch.cuda.amp.autocast():
                 inputs = tr_data['image'].cuda(non_blocking=True)
@@ -114,20 +104,38 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
             scaler.step(optimizer)
             scaler.update()
 
+            # Calculate accuracy, precision and recall
+            _, predicted = torch.max(outputs.data, 1)
+            total += targets.size(0)
+            correct += (predicted == torch.max(targets, 1)[1]).sum().item()
+            train_targets_all.extend(torch.max(targets, 1)[1].cpu().numpy())
+            train_predictions_all.extend(predicted.cpu().numpy())
+
             epoch_loss += loss.detach()
             step += 1
             
         # Log and store average epoch loss
-        epoch_loss = epoch_loss.item() / step
+        epoch_loss=epoch_loss.item() / step
         train_losses.append(epoch_loss)
         print(f'Mean training loss: {epoch_loss}')
+        
+        train_accuracies.append(100 * correct / total)
+        train_precisions.append(precision_score(train_targets_all, train_predictions_all, average='macro'))
+        train_recalls.append(recall_score(train_targets_all, train_predictions_all, average='macro'))
+        #print(f'Mean training loss: {train_losses[-1]}')
+        print(f'Training accuracy: {train_accuracies[-1]}%')
 
-        epoch_loss = 0
-        step = 0
-        val_accuracy = 0
-
+        
         if epoch % EVAL_EVERY == 0:
             model.eval()
+            epoch_loss = 0
+            step = 0
+            total = 0
+            correct = 0
+            val_accuracy = 0
+            val_targets_all = []
+            val_predictions_all = []
+
             with torch.no_grad():  # Do not need gradients for this part
                 for val_data in tqdm(val_loader):
                     inputs = val_data['image'].cuda(non_blocking=True)
@@ -144,15 +152,35 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
                     # calculate accuracy
                     _, predicted = torch.max(outputs, 1)
                     correct = (predicted == torch.argmax(targets, 1)).sum().item()
+
+                    #all_predictions.extend(predicted.cpu().numpy())
+                    #all_labels.extend(torch.max(labels, 1)[1].cpu().numpy())
+
                     total = targets.size(0)
                     val_accuracy += correct / total
+                    val_targets_all.extend(torch.max(targets, 1)[1].cpu().numpy())
+                    val_predictions_all.extend(predicted.cpu().numpy())
 
-            
+            val_losses.append(epoch_loss.item() / step)
+            val_accuracies.append(100 * correct / total)
+            val_precisions.append(precision_score(val_targets_all, val_predictions_all, average='macro'))
+            val_recalls.append(recall_score(val_targets_all, val_predictions_all, average='macro'))
+            print(f'Mean validation loss: {val_losses[-1]}')
+            print(f'Validation accuracy: {val_accuracies[-1]}%')
+
             # Log and store average epoch loss
-            epoch_loss = epoch_loss.item() / step
-            val_losses.append(epoch_loss)
-            print(f'Mean validation loss: {epoch_loss}')
-            print(f'Mean validation accuracy: {val_accuracy / step}')
+            #epoch_loss = epoch_loss.item() / step
+            #val_losses.append(epoch_loss)
+            #print(f'Mean validation accuracy: {val_accuracy / step}')
+
+            # save best model
+            time = datetime.datetime.now()
+            if val_accuracies[-1] == max(val_accuracies):
+                torch.save(model.state_dict(), "3D_models/best_model_"
+                + str(image_size) + "_"
+                + time.strftime('%Y_%m_%d__%H_%M_%S') + "_"
+                + str(LR) + "_"
+                + str(BATCH_SIZE) + ".pt")
 
     time = datetime.datetime.now()
     # save the model
@@ -162,6 +190,7 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
                + str(LR) + "_" 
                + str(BATCH_SIZE) + ".pt")
     # Code for the task here
+
     # Plot the training loss over time
     plt.figure()
     plt.plot(train_losses, label='Training loss')
@@ -185,7 +214,6 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=2)
     parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--seed', type=int, default=42)
-
     args = parser.parse_args()
     torch.manual_seed(args.seed)
     train_loop(args.image_size, args.num_epochs,args.batch_size,args.lr)
