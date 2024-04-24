@@ -52,6 +52,9 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
     train_transforms = monai.transforms.Compose([
         monai.transforms.LoadImaged(keys='image'),
         monai.transforms.EnsureChannelFirstd(keys=['image']),
+        # add more transforms here
+        monai.transforms.GaussianNoise(p=0.5),
+        monai.transforms.RandomAffine(p=0.5)
     ])
 
     train_dataset = Dataset(data=trainFiles, transform=train_transforms)
@@ -101,8 +104,6 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
 
             loss = loss_fn(outputs, targets)
 
-            print("test")
-
             loss.backward()
             optimizer.step()
 
@@ -148,7 +149,7 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig("results/loss_curves.png", bbox_inches='tight')
+    plt.savefig("3D_results/loss_curves.png", bbox_inches='tight')
 
 
 if __name__ == "__main__":
