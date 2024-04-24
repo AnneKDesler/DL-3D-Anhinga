@@ -101,6 +101,8 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
 
             loss = loss_fn(outputs, targets)
 
+            print("test")
+
             loss.backward()
             optimizer.step()
 
