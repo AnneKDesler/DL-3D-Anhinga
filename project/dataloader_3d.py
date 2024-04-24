@@ -53,8 +53,8 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
         monai.transforms.LoadImaged(keys='image'),
         monai.transforms.EnsureChannelFirstd(keys=['image']),
         # add more transforms here
-        monai.transforms.GaussianNoise(p=0.5),
-        monai.transforms.RandomAffine(p=0.5)
+        #monai.transforms.GaussianNoise(p=0.5),
+        #monai.transforms.RandomAffine(p=0.5)
     ])
 
     train_dataset = Dataset(data=trainFiles, transform=train_transforms)
@@ -158,5 +158,7 @@ if __name__ == "__main__":
                         help="Size of volumes in the dataset. Choose 064, 128 or 256")
     parser.add_argument('--num_epochs', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
+    torch.manual_seed(args.seed)
     train_loop(args.image_size, args.num_epochs, args.batch_size)
