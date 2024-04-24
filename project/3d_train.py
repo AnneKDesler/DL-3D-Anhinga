@@ -106,7 +106,7 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
                 outputs = model(inputs)
 
                 # apply softmax to the output of the network
-                outputs = torch.nn.functional.softmax(outputs, dim=1)
+                #outputs = torch.nn.functional.softmax(outputs, dim=1)
 
                 loss = loss_fn(outputs, targets)
 
@@ -124,6 +124,8 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
 
         epoch_loss = 0
         step = 0
+        val_accuracy = 0
+
         if epoch % EVAL_EVERY == 0:
             model.eval()
             with torch.no_grad():  # Do not need gradients for this part
@@ -134,19 +136,31 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
                     outputs = model(inputs)
 
                     # apply softmax to the output of the network
-                    outputs = torch.nn.functional.softmax(outputs, dim=1)
+                    #outputs = torch.nn.functional.softmax(outputs, dim=1)
                     loss = loss_fn(outputs, targets)
                     epoch_loss += loss.detach()
                     step += 1
+
+                    # calculate accuracy
+                    _, predicted = torch.max(outputs, 1)
+                    correct = (predicted == torch.argmax(targets, 1)).sum().item()
+                    total = targets.size(0)
+                    val_accuracy += correct / total
+
             
             # Log and store average epoch loss
             epoch_loss = epoch_loss.item() / step
             val_losses.append(epoch_loss)
             print(f'Mean validation loss: {epoch_loss}')
+            print(f'Mean validation accuracy: {val_accuracy / step}')
 
     time = datetime.datetime.now()
     # save the model
-    torch.save(model.state_dict(), "3D_models/model_" + time.strftime('%Y_%m_%d__%H_%M_%S') + ".pt")
+    torch.save(model.state_dict(), "3D_models/model_" 
+               + str(image_size) + "_" 
+               + time.strftime('%Y_%m_%d__%H_%M_%S') + "_" 
+               + str(LR) + "_" 
+               + str(BATCH_SIZE) + ".pt")
     # Code for the task here
     # Plot the training loss over time
     plt.figure()
@@ -156,8 +170,12 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig("3D_results/train_validation_loss_" + time.strftime('%Y_%m_%d__%H_%M_%S') +".png", bbox_inches='tight')
-
+    plt.savefig("3D_results/train_validation_loss_" 
+                + str(image_size) + "_" 
+                + time.strftime('%Y_%m_%d__%H_%M_%S') + "_" 
+                + str(LR) + "_" 
+                + str(BATCH_SIZE) +".png", 
+                bbox_inches='tight')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

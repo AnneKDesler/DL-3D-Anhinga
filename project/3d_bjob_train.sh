@@ -9,16 +9,16 @@
 ### -- Select the resources: 1 gpu in exclusive process mode --
 #BSUB -gpu "num=1:mode=exclusive_process"
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
-#BSUB -W 00:30
+#BSUB -W 00:4
 # specify system resources
 #BSUB -R "span[hosts=1]"
-#BSUB -R "rusage[mem=6GB]"
+#BSUB -R "rusage[mem=1GB]"
 #BSUB -R "select[gpu32gb]"
 #BSUB -R "select[sxm2]"
 ### -- Specify the output and error file. %J is the job-id --
 ### -- -o and -e mean append, -oo and -eo mean overwrite --
-#BSUB -o batch_output/train_%J.out
-#BSUB -e batch_output/train_%J.err
+#BSUB -o 3D_batch_output/train_%J.out
+#BSUB -e 3D_batch_output/train_%J.err
 # -- end of LSF options --
 
 source /dtu/3d-imaging-center/courses/conda/conda_init.sh
@@ -26,7 +26,7 @@ conda activate env-02510
 
 export CUDA_VISIBLE_DEVICES=0
 
-learning_rates=(1e-3)
+learning_rates=(1e-3 1e-4 1e-4)
 batch_sizes=(16)
 
 for n in "${learning_rates[@]}"
