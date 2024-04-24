@@ -33,7 +33,7 @@ for n in "${learning_rates[@]}"
 do
     for m in "${batch_sizes[@]}"
     do
-        python -u 3d_train.py --learning_rate $n --batch_size $m
+        python -u 3d_train.py --lr $n --batch_size $m
     done
 done
 

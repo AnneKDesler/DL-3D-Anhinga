@@ -14,14 +14,16 @@ import os
 import dxchange
 from tqdm import tqdm
 import argparse
-from datetime import datetime
+import datetime
+from get_data import getBugData
 
+""" 
 def getBugData(dataset_path: Path, num_classes=12, low_percentile = 0.0, high_percentile = 1.0):
     dataset = []
     path_list = os.listdir(dataset_path)
     for idx, item in enumerate(path_list):
         one_hot_v = np.zeros(num_classes)
-        one_hot_v[idx] = 1
+       one_hot_v[idx] = 1
 
         folder = os.listdir(str(dataset_path) + "/"+ item)
 
@@ -33,9 +35,9 @@ def getBugData(dataset_path: Path, num_classes=12, low_percentile = 0.0, high_pe
                                 "class": str(item),
                                 "label": one_hot_v})
     return dataset
+"""
 
-
-def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
+def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
     if image_size == 64:
         image_size = "064"
     DATA_PATH = "/dtu/3d-imaging-center/courses/02510/data/Bugs/bugnist_" + str(image_size) + "/"
@@ -45,9 +47,11 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
     #BATCH_SIZE = 2
 
     # 1. Data. Make a 70-10-20% train-validation-test split here
-    trainFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.0, high_percentile=0.7)
-    valFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.7, high_percentile=0.8)  
-    testFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.8, high_percentile=1.0)
+    #trainFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.0, high_percentile=0.7)
+    trainFiles = getBugData(dataset_path=Path(DATA_PATH),low_percentile = 0.0, high_percentile = 0.7, dim = 3, seed = 42)
+    valFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.7, high_percentile=0.8, dim = 3, seed = 42)
+    #valFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.7, high_percentile=0.8)  
+    #testFiles = getBugData(dataset_path=Path(DATA_PATH), low_percentile=0.8, high_percentile=1.0)
 
     train_transforms = monai.transforms.Compose([
         monai.transforms.LoadImaged(keys='image'),
@@ -75,7 +79,7 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
 
     # More design decisions (model, loss, optimizer) #
     loss_fn = torch.nn.CrossEntropyLoss() # Apply "softmax" to the output of the network and don't convert to onehot because this is done already by the transforms.
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3) 
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR) 
     scaler = torch.cuda.amp.GradScaler()
 
     inferer = monai.inferers.SliceInferer(roi_size=[-1, -1], spatial_dim=2, sw_batch_size=1)
@@ -152,7 +156,7 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig("3D_results/train_validation_loss " + time.strftime('%Y_%m_%d__%H_%M_%S') +".png", bbox_inches='tight')
+    plt.savefig("3D_results/train_validation_loss_" + time.strftime('%Y_%m_%d__%H_%M_%S') +".png", bbox_inches='tight')
 
 
 if __name__ == "__main__":
@@ -161,7 +165,9 @@ if __name__ == "__main__":
                         help="Size of volumes in the dataset. Choose 064, 128 or 256")
     parser.add_argument('--num_epochs', type=int, default=10)
     parser.add_argument('--batch_size', type=int, default=2)
+    parser.add_argument('--lr', type=float, default=1e-3)
     parser.add_argument('--seed', type=int, default=42)
+
     args = parser.parse_args()
     torch.manual_seed(args.seed)
-    train_loop(args.image_size, args.num_epochs, args.batch_size)
+    train_loop(args.image_size, args.num_epochs,args.batch_size,args.lr)
