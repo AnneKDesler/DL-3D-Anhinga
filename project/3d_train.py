@@ -142,7 +142,7 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
 
     time = "test"
     # save the model
-    torch.save(model.state_dict(), "models/model_nE" + time + ".pt")
+    torch.save(model.state_dict(), "3D_models/model_nE" + time + ".pt")
     # Code for the task here
     # Plot the training loss over time
     plt.figure()
@@ -152,7 +152,7 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE):
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig("3D_results/loss_curves.png", bbox_inches='tight')
+    plt.savefig("3D_results/train_validation_loss.png", bbox_inches='tight')
 
 
 if __name__ == "__main__":
