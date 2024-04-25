@@ -36,13 +36,14 @@ def getBugData(dataset_path, low_percentile = 0.0, high_percentile = 1.0, dim = 
                                         "class": class_,
                                         "label": one_hot_v})
             elif dim == 2:
-                 for item in class_folder:
-                    # list only npy files
-                    files = [f for f in os.listdir(os.path.join(dataset_path, class_, item)) if f.endswith('.npy')]#os.listdir(os.path.join(dataset_path, class_, folder))
-                    dataset.append({'projection_01': os.path.join(dataset_path, class_, item, files[0]),
-                                'projection_02': os.path.join(dataset_path, class_, item, files[1]),
-                                'projection_03': os.path.join(dataset_path, class_, item, files[2]),
-                                'label': one_hot_v,
-                                'class': class_})
+                for i, item in enumerate(class_folder):
+                    if i >= start and i < end:
+                        # list only npy files
+                        files = [f for f in os.listdir(os.path.join(dataset_path, class_, item)) if f.endswith('.npy')]#os.listdir(os.path.join(dataset_path, class_, folder))
+                        dataset.append({'projection_01': os.path.join(dataset_path, class_, item, files[0]),
+                                    'projection_02': os.path.join(dataset_path, class_, item, files[1]),
+                                    'projection_03': os.path.join(dataset_path, class_, item, files[2]),
+                                    'label': one_hot_v,
+                                    'class': class_})
     return dataset
 

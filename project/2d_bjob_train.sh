@@ -26,15 +26,14 @@ conda activate env-02510
 
 export CUDA_VISIBLE_DEVICES=0
 
-learning_rates=(1e-3 1e-4 1e-5)
-batch_sizes=(32)
-epochs = 50
+learning_rates=(1e-3 5e-4 1e-4 1e-5)
+batch_sizes=(8 16 32)
 
 for n in "${learning_rates[@]}"
 do
     for m in "${batch_sizes[@]}"
     do
-        python -u 2d_train.py --lr $n --batch_size $m --num_epochs $epochs
+        python -u 2d_train.py --lr $n --batch_size $m
     done
 done
 
