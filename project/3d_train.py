@@ -8,7 +8,6 @@ from monai.transforms.utils import allow_missing_keys_mode
 from monai.transforms import BatchInverseTransform
 from monai.networks.nets import ResNet
 import nibabel as nib
-from tqdm import tqdm
 import medpy.metric as metric
 import os
 import seaborn as sns  
