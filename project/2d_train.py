@@ -22,6 +22,12 @@ os.chdir('/dtu/3d-imaging-center/courses/02510/groups/group_Anhinga/Anne/DL-3D-A
 from get_data import getBugData
 
 def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
+
+    time = datetime.datetime.now()
+    t = time.strftime('%Y_%m_%d__%H_%M_%S')
+    save_folder = os.path.join("2D_models", f'lr_{LR}_b_{BATCH_SIZE}_e_{NUM_EPOCHS}', t)
+    os.makedirs(save_folder)
+
     DATA_PATH = 'data'
     # Hyper-parameters (next three lines) #
     #NUM_EPOCHS = 2
@@ -30,8 +36,11 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
 
     # 1. Data. Make a 70-10-20% train-validation-test split here
     trainFiles = getBugData(DATA_PATH, low_percentile=0.0, high_percentile=0.7, dim=2)
+    print(f"Number of training samples: {len(trainFiles)}")
     valFiles = getBugData(DATA_PATH, low_percentile=0.7, high_percentile=0.8, dim=2)
+    print(f"Number of validation samples: {len(valFiles)}")
     testFiles = getBugData(DATA_PATH, low_percentile=0.8, high_percentile=1.0, dim=2)
+    print(f"Number of test samples: {len(testFiles)}")
 
     train_transforms = monai.transforms.Compose([
         monai.transforms.LoadImaged(keys=['projection_01', 'projection_02', 'projection_03'], ensure_channel_first=True),
@@ -61,14 +70,16 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
                 n_input_channels=3,
                 num_classes = 12,
                 block_inplanes = [16, 32, 64, 128]
-)
+    )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
 
     # More design decisions (model, loss, optimizer) #
     loss_fn = torch.nn.CrossEntropyLoss() # Apply "softmax" to the output of the network and don't convert to onehot because this is done already by the transforms.
-    optimizer = torch.optim.Adam(model.parameters(), lr=LR) 
+    # use a scheduler 
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    scheduler = torch.optim.lr_scheduler.LinearLR(optimizer)
     scaler = torch.cuda.amp.GradScaler()
 
     inferer = monai.inferers.SliceInferer(roi_size=[-1, -1], spatial_dim=2, sw_batch_size=1)
@@ -81,6 +92,8 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
     val_precisions = []
     train_recalls = []
     val_recalls = []
+
+    best_val_accuracy = 0
 
     print("Starting training")
 
@@ -96,28 +109,32 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
         train_predictions_all = []
 
         for tr_data in tqdm(train_loader):
-            with torch.cuda.amp.autocast():
-                inputs = torch.cat([
-                    tr_data['projection_01'],
-                    tr_data['projection_02'],
-                    tr_data['projection_03']
-                ], dim=1).cuda(non_blocking=True)
+            #with torch.cuda.amp.autocast():
+            inputs = torch.cat([
+                tr_data['projection_01'],
+                tr_data['projection_02'],
+                tr_data['projection_03']
+            ], dim=1).cuda(non_blocking=True)
 
-                targets = tr_data['label'].cuda(non_blocking=True)
+            targets = tr_data['label'].cuda(non_blocking=True)
 
-                # Forward -> Backward -> Step
-                optimizer.zero_grad()
+            # Forward -> Backward -> Step
+            optimizer.zero_grad()
 
-                outputs = model(inputs)
+            outputs = model(inputs)
 
-                # apply softmax to the output of the network
-                #outputs = torch.nn.functional.softmax(outputs, dim=1)
+            # apply softmax to the output of the network
+            #outputs = torch.nn.functional.softmax(outputs, dim=1)
 
-                loss = loss_fn(outputs, targets)
+            loss = loss_fn(outputs, targets)
 
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+            loss.backward()
+            optimizer.step()
+
+            #scaler.scale(loss).backward()
+            #scaler.step(optimizer)
+            #scaler.update()
+            
 
             # Calculate accuracy
             _, predicted = torch.max(outputs.data, 1)
@@ -128,7 +145,8 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
 
             epoch_loss += loss.item()
             steps += 1
-            
+
+        scheduler.step()
         # Log and store average epoch loss
         epoch_loss = epoch_loss / steps
         train_losses.append(epoch_loss)
@@ -176,22 +194,38 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
             # Log and store average epoch loss
             epoch_loss = epoch_loss / steps
             val_losses.append(epoch_loss)
-            val_accuracies.append(100 * correct / total)
+            val_accuracy = 100 * correct / total
+            val_accuracies.append(val_accuracy)
             val_precisions.append(precision_score(val_targets_all, val_predictions_all, average='macro'))
             val_recalls.append(recall_score(val_targets_all, val_predictions_all, average='macro'))
+            
+            if val_accuracy > best_val_accuracy:
+                best_val_accuracy = val_accuracy
+                dict = {
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'loss': epoch_loss,
+                    'accuracy': val_accuracy
+                }
+                torch.save(dict, os.path.join(save_folder, "best_model.pt"))
             
             print(f'Mean validation loss: {epoch_loss}')
             print(f'Validation accuracy: {val_accuracies[-1]}%')
 
-    time = datetime.datetime.now()
-    t = time.strftime('%Y_%m_%d__%H_%M_%S')
-    save_folder = "2D_models/" + t
-    os.makedirs(save_folder)
+    time_end = datetime.datetime.now()
+    print(f'Training took {time_end - time}')
+
+    
     # save the model
     torch.save(model.state_dict(), os.path.join(save_folder, "model.pt"))
 
-    save_folder = "2D_results/" + t
-    # Code for the task here
+    save_folder = os.path.join("2D_results", f'lr_{LR}_b_{BATCH_SIZE}_e_{NUM_EPOCHS}', t)
+
+    os.makedirs(save_folder)
+    # save the time in a txt file
+    with open(os.path.join(save_folder, "time.txt"), "w") as f:
+        f.write(f'Training took {time_end - time}')
+
     # Plot the training loss over time
     plt.figure()
     plt.plot(train_losses, label='Training loss')
@@ -237,8 +271,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--image_size', type=str, default=128,
                         help="Size of volumes in the dataset. Choose 064, 128 or 256")
-    parser.add_argument('--num_epochs', type=int, default=3)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--num_epochs', type=int, default=100)
+    parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--lr', type=float, default=0.001)
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()

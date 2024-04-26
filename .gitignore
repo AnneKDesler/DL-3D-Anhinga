@@ -4,6 +4,7 @@ results/
 3D_results/
 3D_models/
 3D_batch_output/
+2D_batch_output/
 2D_results/
 2D_models/
 __pycache__/
