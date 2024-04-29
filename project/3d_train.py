@@ -157,7 +157,6 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
             step = 0
             total = 0
             correct = 0
-            val_accuracy = 0
             val_targets_all = []
             val_predictions_all = []
 
@@ -176,12 +175,13 @@ def train_loop(image_size, NUM_EPOCHS, BATCH_SIZE, LR):
 
                     # calculate accuracy
                     _, predicted = torch.max(outputs, 1)
-                    correct = (predicted == torch.argmax(targets, 1)).sum().item()
+                    total += targets.size(0)
+                    correct += (predicted == torch.argmax(targets, 1)).sum().item()
                     #all_predictions.extend(predicted.cpu().numpy())
                     #all_labels.extend(torch.max(labels, 1)[1].cpu().numpy())
 
-                    total += targets.size(0)
-                    val_accuracy += correct / total
+                    
+                    #val_accuracy += correct / total
                     val_targets_all.extend(torch.max(targets, 1)[1].cpu().numpy())
                     val_predictions_all.extend(predicted.cpu().numpy())
 

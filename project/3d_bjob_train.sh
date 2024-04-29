@@ -10,7 +10,7 @@
 #BSUB -gpu "num=1:mode=exclusive_process"
 #BSUB -u s185231@dtu.dk
 ### -- set walltime limit: hh:mm --  maximum 24 hours for GPU-queues right now
-#BSUB -W 12:00
+#BSUB -W 18:00
 # specify system resources
 #BSUB -R "span[hosts=1]"
 #BSUB -R "rusage[mem=16GB]"
@@ -28,7 +28,7 @@ conda activate env-02510
 export CUDA_VISIBLE_DEVICES=0
 
 learning_rates=(1e-3 5e-4 1e-4 1e-5)
-batch_sizes=(8 16 32)
+batch_sizes=(8)
 
 for n in "${learning_rates[@]}"
 do
